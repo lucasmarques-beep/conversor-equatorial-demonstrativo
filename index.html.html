@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Conversor Equatorial — Resumo por UC</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@600&display=swap" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --azul-escuro:#1F4E79;--azul-medio:#2E75B6;--azul-claro:#D6E4F0;
+  --azul-fundo:#EBF3FB;--verde:#1A7A4A;--verde-bg:#E6F4ED;
+  --vermelho:#C0392B;--vermelho-bg:#FDECEA;
+  --cinza-100:#F4F6F9;--cinza-200:#E2E8F0;--cinza-500:#94A3B8;
+  --cinza-700:#475569;--texto:#1E293B;--radius:10px;
+  --shadow:0 4px 24px rgba(31,78,121,.10);
+}
+body{font-family:'Inter',sans-serif;background:var(--cinza-100);color:var(--texto);
+  min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:40px 16px 60px}
+
+header{width:100%;max-width:640px;margin-bottom:32px;text-align:center}
+.logo-badge{display:inline-flex;align-items:center;gap:8px;background:var(--azul-escuro);
+  color:#fff;font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;
+  padding:5px 12px;border-radius:20px;margin-bottom:14px}
+header h1{font-size:26px;font-weight:700;color:var(--azul-escuro);line-height:1.25;margin-bottom:8px}
+header p{font-size:14px;color:var(--cinza-700);line-height:1.6}
+
+.card{width:100%;max-width:640px;background:#fff;border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden}
+.card-body{padding:32px}
+
+.dropzone{border:2px dashed var(--azul-claro);border-radius:var(--radius);background:var(--azul-fundo);
+  padding:40px 24px;text-align:center;cursor:pointer;transition:border-color .2s,background .2s;position:relative}
+.dropzone:hover,.dropzone.drag-over{border-color:var(--azul-medio);background:#dbeaf7}
+.dropzone input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%}
+.dropzone-icon{font-size:36px;margin-bottom:10px;display:block}
+.dropzone-title{font-size:15px;font-weight:600;color:var(--azul-escuro);margin-bottom:4px}
+.dropzone-sub{font-size:13px;color:var(--cinza-700)}
+.dropzone.has-file{border-color:var(--verde);background:var(--verde-bg)}
+.file-name{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--verde);font-weight:600;margin-top:6px}
+
+.progress-wrap{margin-top:24px;display:none}
+.progress-wrap.visible{display:block}
+.progress-label{font-size:13px;color:var(--cinza-700);margin-bottom:8px;display:flex;align-items:center;gap:8px}
+.spinner{width:14px;height:14px;border:2px solid var(--azul-claro);border-top-color:var(--azul-medio);
+  border-radius:50%;animation:spin .7s linear infinite;flex-shrink:0}
+@keyframes spin{to{transform:rotate(360deg)}}
+.progress-bar-track{height:6px;background:var(--cinza-200);border-radius:99px;overflow:hidden}
+.progress-bar-fill{height:100%;background:linear-gradient(90deg,var(--azul-medio),var(--azul-escuro));
+  border-radius:99px;transition:width .3s ease;width:0%}
+
+.btn-converter{margin-top:24px;width:100%;padding:14px;background:var(--azul-escuro);color:#fff;
+  font-family:'Inter',sans-serif;font-size:15px;font-weight:600;border:none;border-radius:var(--radius);
+  cursor:pointer;transition:background .2s,transform .1s;display:flex;align-items:center;justify-content:center;gap:8px}
+.btn-converter:hover:not(:disabled){background:#174069}
+.btn-converter:active:not(:disabled){transform:scale(.98)}
+.btn-converter:disabled{background:var(--cinza-500);cursor:not-allowed}
+
+.alert{margin-top:20px;padding:14px 16px;border-radius:var(--radius);font-size:13px;
+  line-height:1.6;display:none}
+.alert.visible{display:flex;gap:10px;align-items:flex-start}
+.alert-error{background:var(--vermelho-bg);color:var(--vermelho);border:1px solid #f1a89d}
+.alert-icon{font-size:16px;flex-shrink:0}
+
+.resultado-wrap{margin-top:20px;display:none}
+.resultado-wrap.visible{display:block}
+.resultado-stats{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px}
+.stat-box{background:var(--azul-fundo);border-radius:8px;padding:14px 16px;text-align:center}
+.stat-valor{font-size:22px;font-weight:700;color:var(--azul-escuro);font-family:'JetBrains Mono',monospace}
+.stat-label{font-size:11px;color:var(--cinza-700);text-transform:uppercase;letter-spacing:.06em;margin-top:2px}
+.btn-download{width:100%;padding:13px;background:var(--verde);color:#fff;font-family:'Inter',sans-serif;
+  font-size:15px;font-weight:600;border:none;border-radius:var(--radius);cursor:pointer;
+  display:flex;align-items:center;justify-content:center;gap:8px;transition:background .2s}
+.btn-download:hover{background:#145e37}
+
+.info-strip{width:100%;max-width:640px;margin-top:20px;background:#fff;border-radius:var(--radius);
+  padding:16px 20px;display:flex;gap:24px;flex-wrap:wrap}
+.info-item{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--cinza-700)}
+.info-dot{width:8px;height:8px;border-radius:50%;background:var(--azul-medio);flex-shrink:0}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo-badge">⚡ Nextron Energia</div>
+  <h1>Conversor de Demonstrativo<br>Equatorial Goiás</h1>
+  <p>Faça upload do arquivo exportado da Equatorial e baixe o<br>resumo consolidado por UC em segundos.</p>
+</header>
+
+<div class="card">
+  <div class="card-body">
+
+    <div class="dropzone" id="dropzone">
+      <input type="file" id="file-input" accept=".xlsx,.xls"/>
+      <span class="dropzone-icon" id="dz-icon">📂</span>
+      <div class="dropzone-title" id="dz-title">Arraste o arquivo aqui ou clique para selecionar</div>
+      <div class="dropzone-sub" id="dz-sub">Demonstrativo Equatorial (.xlsx)</div>
+      <div class="file-name" id="dz-filename"></div>
+    </div>
+
+    <div class="progress-wrap" id="progress-wrap">
+      <div class="progress-label">
+        <div class="spinner"></div>
+        <span id="progress-text">Processando…</span>
+      </div>
+      <div class="progress-bar-track">
+        <div class="progress-bar-fill" id="progress-fill"></div>
+      </div>
+    </div>
+
+    <div class="alert alert-error" id="alert-error">
+      <span class="alert-icon">⚠️</span>
+      <span id="alert-error-text"></span>
+    </div>
+
+    <div class="resultado-wrap" id="resultado-wrap">
+      <div class="resultado-stats">
+        <div class="stat-box">
+          <div class="stat-valor" id="stat-linhas">—</div>
+          <div class="stat-label">Linhas geradas</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-valor" id="stat-ucs">—</div>
+          <div class="stat-label">UCs únicas</div>
+        </div>
+      </div>
+      <button class="btn-download" id="btn-download">⬇ Baixar Resumo (.xlsx)</button>
+    </div>
+
+    <button class="btn-converter" id="btn-converter" disabled>
+      <span>▶</span> Converter
+    </button>
+
+  </div>
+</div>
+
+<div class="info-strip">
+  <div class="info-item"><div class="info-dot"></div>Processamento 100% local — nenhum dado é enviado para servidores</div>
+  <div class="info-item"><div class="info-dot"></div>Compatível com Chrome, Edge e Firefox</div>
+  <div class="info-item"><div class="info-dot"></div>Sem instalação necessária</div>
+</div>
+
+<script>
+// ─── ESTADO ───────────────────────────────────────────
+let arquivoArrayBuffer = null;
+let nomeArquivo        = '';
+let resultadoBytes     = null;
+
+// ─── DROP ZONE ────────────────────────────────────────
+const dropzone  = document.getElementById('dropzone');
+const fileInput = document.getElementById('file-input');
+
+dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('drag-over'); });
+dropzone.addEventListener('dragleave', () => dropzone.classList.remove('drag-over'));
+dropzone.addEventListener('drop', e => {
+  e.preventDefault(); dropzone.classList.remove('drag-over');
+  if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+});
+fileInput.addEventListener('change', e => { if (e.target.files[0]) handleFile(e.target.files[0]); });
+
+function handleFile(file) {
+  nomeArquivo = file.name;
+  resetUI();
+  const reader = new FileReader();
+  reader.onload = ev => {
+    arquivoArrayBuffer = ev.target.result;
+    dropzone.classList.add('has-file');
+    document.getElementById('dz-icon').textContent     = '✅';
+    document.getElementById('dz-title').textContent    = 'Arquivo selecionado';
+    document.getElementById('dz-sub').textContent      = '';
+    document.getElementById('dz-filename').textContent = file.name;
+    document.getElementById('btn-converter').disabled  = false;
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+// ─── CONVERTER ────────────────────────────────────────
+document.getElementById('btn-converter').addEventListener('click', () => {
+  if (!arquivoArrayBuffer) return;
+  const btn = document.getElementById('btn-converter');
+  btn.disabled = true;
+  hideError(); hideResultado();
+
+  // Usar setTimeout para deixar o browser renderizar o progresso antes de processar
+  setTimeout(() => {
+    try {
+      processar();
+    } catch(e) {
+      hideProgress();
+      showError(e.message || String(e));
+      btn.disabled = false;
+    }
+  }, 50);
+});
+
+// ─── PROCESSAMENTO EM JS ──────────────────────────────
+function processar() {
+  setProgress('Lendo arquivo…', 10);
+
+  // 1. Ler xlsx com SheetJS
+  const wb  = XLSX.read(arquivoArrayBuffer, { type: 'array', cellDates: true });
+  const ws  = wb.Sheets[wb.SheetNames[0]];
+  const raw = XLSX.utils.sheet_to_json(ws, { defval: null });
+
+  if (!raw.length) throw new Error('Arquivo vazio ou formato não reconhecido.');
+
+  // Validar colunas obrigatórias
+  const colsOk = ['UC_BENEFICIARIA','SALDO','TIPO_LANCAMENTO','MES_REFERENCIA','ANO_REFERENCIA','REF_FATURAMENTO','PERCENTUAL_RATEIO'];
+  for (const c of colsOk) {
+    if (!(c in raw[0])) throw new Error(`Coluna "${c}" não encontrada.\nVerifique se é um demonstrativo Equatorial válido.`);
+  }
+
+  setProgress('Calculando energia recebida…', 30);
+
+  // Colunas A-H (primeiras 8 chaves)
+  const colsAH = Object.keys(raw[0]).slice(0, 8);
+
+  // Info fixa por UC (primeira ocorrência)
+  const infoUC = {};
+  for (const row of raw) {
+    const uc = String(row['UC_BENEFICIARIA']);
+    if (!(uc in infoUC)) {
+      infoUC[uc] = {};
+      for (const c of colsAH) infoUC[uc][c] = row[c];
+    }
+  }
+
+  // Energia Recebida + Percentual  (TIPO_LANCAMENTO == 'Distribuicao')
+  // Chave: UC_BENEFICIARIA + MES_REFERENCIA + ANO_REFERENCIA
+  const mapRecebida = {};   // chave -> { recebida, percentual, mes, ano }
+  for (const row of raw) {
+    if (row['TIPO_LANCAMENTO'] !== 'Distribuicao') continue;
+    const uc  = String(row['UC_BENEFICIARIA']);
+    const mes = Number(row['MES_REFERENCIA']);
+    const ano = Number(row['ANO_REFERENCIA']);
+    const key = `${uc}|${ano}|${String(mes).padStart(2,'0')}`;
+    if (!(key in mapRecebida)) {
+      mapRecebida[key] = { uc, mes, ano, recebida: 0, percentual: null };
+    }
+    mapRecebida[key].recebida += Number(row['SALDO']) || 0;
+    if (mapRecebida[key].percentual === null && row['PERCENTUAL_RATEIO'] !== null) {
+      mapRecebida[key].percentual = Number(row['PERCENTUAL_RATEIO']);
+    }
+  }
+
+  setProgress('Calculando energia compensada…', 55);
+
+  // Energia Compensada (TIPO_LANCAMENTO == 'Faturamento')
+  // Chave: UC_BENEFICIARIA + REF_FATURAMENTO (MM/YYYY → YYYY-MM)
+  const mapCompensada = {};
+  for (const row of raw) {
+    if (row['TIPO_LANCAMENTO'] !== 'Faturamento') continue;
+    const ref = row['REF_FATURAMENTO'];
+    if (!ref) continue;
+    // REF_FATURAMENTO vem como "MM/YYYY"
+    const partes = String(ref).split('/');
+    if (partes.length !== 2) continue;
+    const mesRef = partes[0].padStart(2,'0');
+    const anoRef = partes[1];
+    const uc  = String(row['UC_BENEFICIARIA']);
+    const key = `${uc}|${anoRef}|${mesRef}`;
+    if (!(key in mapCompensada)) mapCompensada[key] = 0;
+    mapCompensada[key] += Math.abs(Number(row['SALDO']) || 0);
+  }
+
+  setProgress('Calculando saldos…', 70);
+
+  // Montar base ordenada por UC + ano + mes
+  const base = Object.values(mapRecebida).sort((a, b) => {
+    if (a.uc !== b.uc) return a.uc.localeCompare(b.uc);
+    if (a.ano !== b.ano) return a.ano - b.ano;
+    return a.mes - b.mes;
+  });
+
+  // Saldo sequencial por UC
+  const saldoAcum = {};
+  for (const item of base) {
+    const saldoAnt  = saldoAcum[item.uc] || 0;
+    const key       = `${item.uc}|${item.ano}|${String(item.mes).padStart(2,'0')}`;
+    const compensada = mapCompensada[key] || 0;
+    let saldoAtual  = item.recebida + saldoAnt - compensada;
+
+    // Zerar ruído de ponto flutuante
+    if (Math.abs(saldoAnt)   < 1e-9) item.saldoAnterior = 0; else item.saldoAnterior = saldoAnt;
+    if (Math.abs(saldoAtual) < 1e-9) saldoAtual = 0;
+    item.compensada  = compensada;
+    item.saldoAtual  = saldoAtual;
+    saldoAcum[item.uc] = saldoAtual;
+    item.mesRef = String(item.mes).padStart(2,'0') + '/' + item.ano;
+  }
+
+  setProgress('Gerando Excel…', 85);
+
+  // ── Gerar xlsx com estilos via SheetJS ──────────────
+  const COR_H   = 'FF1F4E79';
+  const COR_HC  = 'FF2E75B6';
+  const COR_ALT = 'FFEBF3FB';
+  const COR_BRANCO = 'FFFFFFFF';
+
+  const headers = [...colsAH, 'PERCENTUAL RATEIO', 'MÊS REFERÊNCIA',
+                   'ENERGIA RECEBIDA', 'ENERGIA COMPENSADA', 'SALDO ANTERIOR', 'SALDO ATUAL'];
+
+  const wbOut  = XLSX.utils.book_new();
+  const wsOut  = {};
+
+  // Helper estilo célula
+  function cellStyle(bgColor, bold, numFmt, halign) {
+    return {
+      font:      { name: 'Arial', sz: 10, bold: !!bold, color: { rgb: bold ? 'FFFFFFFF' : 'FF1E293B' } },
+      fill:      bgColor ? { patternType: 'solid', fgColor: { rgb: bgColor } } : undefined,
+      alignment: { horizontal: halign || 'center', vertical: 'center', wrapText: !!bold },
+      border: {
+        top:    { style: 'thin', color: { rgb: 'FFBFBFBF' } },
+        bottom: { style: 'thin', color: { rgb: 'FFBFBFBF' } },
+        left:   { style: 'thin', color: { rgb: 'FFBFBFBF' } },
+        right:  { style: 'thin', color: { rgb: 'FFBFBFBF' } },
+      },
+      numFmt: numFmt || null,
+    };
+  }
+
+  // Linha de cabeçalho (linha 1)
+  const range = { s: { r: 0, c: 0 }, e: { r: base.length, c: headers.length - 1 } };
+
+  for (let ci = 0; ci < headers.length; ci++) {
+    const addr = XLSX.utils.encode_cell({ r: 0, c: ci });
+    wsOut[addr] = {
+      v: headers[ci], t: 's',
+      s: cellStyle(ci < 8 ? COR_H : COR_HC, true, null, 'center')
+    };
+  }
+
+  // Linhas de dados
+  for (let ri = 0; ri < base.length; ri++) {
+    const item   = base[ri];
+    const ucInfo = infoUC[item.uc] || {};
+    const bg     = (ri % 2 === 0) ? COR_ALT : null;
+    const excelRow = ri + 1; // +1 por causa do cabeçalho
+
+    // Colunas A-H
+    for (let ci = 0; ci < colsAH.length; ci++) {
+      const addr = XLSX.utils.encode_cell({ r: excelRow, c: ci });
+      const val  = ucInfo[colsAH[ci]];
+      const isNum = typeof val === 'number';
+      wsOut[addr] = { v: val !== null ? val : '', t: isNum ? 'n' : 's',
+                      s: cellStyle(bg, false, isNum ? '0' : null, 'center') };
+    }
+
+    // Percentual Rateio (col I = índice 8)
+    const addrPct = XLSX.utils.encode_cell({ r: excelRow, c: 8 });
+    wsOut[addrPct] = { v: item.percentual !== null ? item.percentual : '', t: 'n',
+                       s: cellStyle(bg, false, '0.00"%"', 'center') };
+
+    // Mês Referência (col J = índice 9)
+    const addrMes = XLSX.utils.encode_cell({ r: excelRow, c: 9 });
+    wsOut[addrMes] = { v: item.mesRef, t: 's', s: cellStyle(bg, false, null, 'center') };
+
+    // Energia Recebida (col K = índice 10)
+    const addrRec = XLSX.utils.encode_cell({ r: excelRow, c: 10 });
+    wsOut[addrRec] = { v: item.recebida, t: 'n', s: cellStyle(bg, false, '#,##0.00', 'right') };
+
+    // Energia Compensada (col L = índice 11)
+    const addrComp = XLSX.utils.encode_cell({ r: excelRow, c: 11 });
+    wsOut[addrComp] = { v: item.compensada, t: 'n', s: cellStyle(bg, false, '#,##0.00', 'right') };
+
+    // Saldo Anterior (col M = índice 12)
+    const addrAnt = XLSX.utils.encode_cell({ r: excelRow, c: 12 });
+    wsOut[addrAnt] = { v: item.saldoAnterior, t: 'n', s: cellStyle(bg, false, '#,##0.00', 'right') };
+
+    // Saldo Atual (col N = índice 13)
+    const addrAtual = XLSX.utils.encode_cell({ r: excelRow, c: 13 });
+    wsOut[addrAtual] = { v: item.saldoAtual, t: 'n', s: cellStyle(bg, false, '#,##0.00', 'right') };
+  }
+
+  // Range e larguras
+  wsOut['!ref'] = XLSX.utils.encode_range(range);
+  wsOut['!cols'] = [18,18,14,30,10,20,12,12,16,14,16,18,16,14].map(w => ({ wch: w }));
+  wsOut['!freeze'] = { xSplit: 0, ySplit: 1 };  // congelar linha 1
+  wsOut['!rows'] = [{ hpt: 35 }];               // altura cabeçalho
+
+  XLSX.utils.book_append_sheet(wbOut, wsOut, 'Resumo por UC');
+
+  const wbBytes = XLSX.write(wbOut, { bookType: 'xlsx', type: 'array', cellStyles: true });
+  resultadoBytes = new Uint8Array(wbBytes);
+
+  setProgress('Concluído!', 100);
+  hideProgress();
+
+  const totalUCs = Object.keys(infoUC).filter(uc =>
+    base.some(b => b.uc === uc)
+  ).length;
+
+  showResultado(base.length, totalUCs);
+  document.getElementById('btn-converter').disabled = false;
+}
+
+// ─── DOWNLOAD ─────────────────────────────────────────
+document.getElementById('btn-download').addEventListener('click', () => {
+  if (!resultadoBytes) return;
+  const nomeSaida = nomeArquivo.replace(/\.(xlsx|xls)$/i, '') + '_RESUMO.xlsx';
+  const blob = new Blob([resultadoBytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = nomeSaida; a.click();
+  URL.revokeObjectURL(url);
+});
+
+// ─── HELPERS UI ───────────────────────────────────────
+function setProgress(msg, pct) {
+  document.getElementById('progress-wrap').classList.add('visible');
+  document.getElementById('progress-text').textContent = msg;
+  document.getElementById('progress-fill').style.width = pct + '%';
+}
+function hideProgress() {
+  document.getElementById('progress-wrap').classList.remove('visible');
+  document.getElementById('progress-fill').style.width = '0%';
+}
+function showError(msg) {
+  document.getElementById('alert-error-text').textContent = msg;
+  document.getElementById('alert-error').classList.add('visible');
+}
+function hideError()     { document.getElementById('alert-error').classList.remove('visible'); }
+function showResultado(linhas, ucs) {
+  document.getElementById('stat-linhas').textContent = Number(linhas).toLocaleString('pt-BR');
+  document.getElementById('stat-ucs').textContent    = Number(ucs).toLocaleString('pt-BR');
+  document.getElementById('resultado-wrap').classList.add('visible');
+}
+function hideResultado() {
+  document.getElementById('resultado-wrap').classList.remove('visible');
+  resultadoBytes = null;
+}
+function resetUI() { hideProgress(); hideError(); hideResultado(); }
+</script>
+</body>
+</html>
